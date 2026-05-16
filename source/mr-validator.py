@@ -133,17 +133,17 @@ def main():
         logger.info("--- Validation Summary ---")
         for msg in messages:
             if msg.startswith("[PASS]"):
-                print_green(msg)
+                logger.info(msg)
             elif msg.startswith("[FAIL]"):
-                print_red(msg)
+                logger.error(msg)
             else:
                 logger.info(msg)
         logger.info("--------------------------")
         if passed:
-            print_green("Result: PASS. MR can be merged.")
+            logger.info("Result: PASS. MR can be merged.")
             sys.exit(0)
         else:
-            print_red("Result: FAIL. MR does not meet requirements.")
+            logger.error("Result: FAIL. MR does not meet requirements.")
             sys.exit(1)
 
 
