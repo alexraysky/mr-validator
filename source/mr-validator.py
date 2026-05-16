@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import json
 from dotenv import load_dotenv
 
 from gitlab_client import GitLabClient
@@ -8,6 +9,7 @@ from jira_client import JiraClient
 from validator import Validator
 from constants import TICKET_REGEX, VALID_JIRA_STATES, DEFAULT_PROJECT_ID
 from helpers import *
+from logging_config import setup_logging, logger
 
 
 def parse_args():
@@ -33,6 +35,22 @@ def parse_args():
         default=os.getenv("JIRA_BASE_URL", "http://localhost:8080"), 
         help="Jira Base URL"
     )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable detailed verbose logging"
+    )
+    parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Only log errors"
+    )
+    parser.add_argument(
+        "--output-format", "-f",
+        choices=["text", "json"],
+        default="text",
+        help="Select the output format (text or json)"
+    )
     
     return parser.parse_args()
 
@@ -41,6 +59,9 @@ def main():
     load_dotenv()
 
     args = parse_args()
+
+    # Initialize structured logging
+    setup_logging(verbose=args.verbose, quiet=args.quiet)
 
     # get tokens from env
     gitlab_token = os.getenv("GITLAB_TOKEN")
@@ -59,25 +80,39 @@ def main():
     )
 
     # do the validation
-    print(f"Validating MR !{args.mr_iid} for project {args.project_id}...")
+    logger.info(f"Validating MR !{args.mr_iid} for project {args.project_id}...")
     passed, messages = validator.validate_mr(args.project_id, args.mr_iid)
 
-    # print results
-    print("\n--- Validation Summary ---")
-    for msg in messages:
-        if msg.startswith("[PASS]"):
-            print_green(msg)
-        elif msg.startswith("[FAIL]"):
-            print_red(msg)
-        else:
-            print(msg)
-    print("--------------------------")
-    if passed:
-        print_green("Result: PASS. MR can be merged.")
-        sys.exit(0)
+    # Output results based on format
+    if args.output_format == "json":
+        result = {
+            "passed": passed,
+            "project_id": args.project_id,
+            "mr_iid": args.mr_iid,
+            "messages": messages
+        }
+        # Print JSON document cleanly to stdout
+        print(json.dumps(result, indent=2))
+        sys.exit(0 if passed else 1)
     else:
-        print_red("Result: FAIL. MR does not meet requirements.")
-        sys.exit(1)
+        # print text results via logger
+        logger.info("")
+        logger.info("--- Validation Summary ---")
+        for msg in messages:
+            if msg.startswith("[PASS]"):
+                print_green(msg)
+            elif msg.startswith("[FAIL]"):
+                print_red(msg)
+            else:
+                logger.info(msg)
+        logger.info("--------------------------")
+        if passed:
+            print_green("Result: PASS. MR can be merged.")
+            sys.exit(0)
+        else:
+            print_red("Result: FAIL. MR does not meet requirements.")
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
+
