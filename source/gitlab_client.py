@@ -1,6 +1,7 @@
 import urllib.parse
 import requests
 from helpers import with_retries
+from constants import REQUEST_TIMEOUT
 
 class GitLabClient:
     def __init__(self, base_url: str = "https://gitlab.com", token: str = None):
@@ -14,7 +15,7 @@ class GitLabClient:
         """Fetch MR metadata like title, description, state, draft status, and source branch."""
         project_encoded = urllib.parse.quote(project_id, safe='')
         url = f"{self.base_url}/api/v4/projects/{project_encoded}/merge_requests/{mr_iid}"
-        response = self.session.get(url)
+        response = self.session.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         return response.json()
 
@@ -23,6 +24,6 @@ class GitLabClient:
         """Fetch commits associated with the MR."""
         project_encoded = urllib.parse.quote(project_id, safe='')
         url = f"{self.base_url}/api/v4/projects/{project_encoded}/merge_requests/{mr_iid}/commits"
-        response = self.session.get(url)
+        response = self.session.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         return response.json()
