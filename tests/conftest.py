@@ -1,6 +1,9 @@
 import sys
 import os
 
-# Add the source directory to the path so that tests can import modules
-# both as 'from source.xxx' and just 'import xxx' if needed by the source itself.
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'source')))
+# Add both the project root and the source directory to sys.path so that tests can import
+# modules as 'from source.xxx' (root) and internal modules can import each other as 'import xxx' (source).
+root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, root_dir)
+sys.path.insert(0, os.path.join(root_dir, 'source'))
+
