@@ -23,15 +23,21 @@ class Validator:
 
     def extract_tickets(self, mr_data: dict, commits: list) -> set:
         """Extract all unique Jira tickets from MR title, description, branch, and commits."""
+        if not isinstance(mr_data, dict):
+            mr_data = {}
+        if not isinstance(commits, list):
+            commits = []
+            
         text_sources = [
-            mr_data.get('title', ''),
-            mr_data.get('description', ''),
-            mr_data.get('source_branch', '')
+            mr_data.get('title') or '',
+            mr_data.get('description') or '',
+            mr_data.get('source_branch') or ''
         ]
         
         for commit in commits:
-            text_sources.append(commit.get('title', ''))
-            text_sources.append(commit.get('message', ''))
+            if isinstance(commit, dict):
+                text_sources.append(commit.get('title') or '')
+                text_sources.append(commit.get('message') or '')
             
         # Strip code blocks from each source to avoid false positives
         cleaned_sources = [self._strip_code_blocks(text) for text in text_sources if text]
@@ -43,12 +49,16 @@ class Validator:
         Validates the MR against all rules.
         Returns a tuple: (passed: bool, output_messages: list of str)
         """
+        import requests
         messages = []
         passed = True
 
         try:
             mr_data = self.gitlab.get_merge_request(project_id, mr_iid)
             commits = self.gitlab.get_merge_request_commits(project_id, mr_iid)
+        except requests.exceptions.RequestException:
+            # Let actual connection/timeout/network errors bubble up
+            raise
         except Exception as e:
             messages.append(f"[FAIL] Could not fetch MR data from GitLab: {e}")
             return False, messages
@@ -86,13 +96,15 @@ class Validator:
                     messages.append(f"[PASS] Rule 3: Jira ticket {ticket} exists.")
 
                 # Rule 4: Status
-                # Based on mock_jira.py or standard Jira structure, status is usually at fields -> status -> name
                 status_name = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
                 if status_name not in self.valid_jira_states:
                     messages.append(f"[FAIL] Rule 4: Jira ticket {ticket} is in invalid state '{status_name}'. Allowed states: {', '.join(self.valid_jira_states)}.")
                     passed = False
                 else:
                     messages.append(f"[PASS] Rule 4: Jira ticket {ticket} is in valid state '{status_name}'.")
+            except requests.exceptions.RequestException:
+                # Let actual connection/timeout/network errors bubble up
+                raise
             except Exception as e:
                 messages.append(f"[FAIL] Error validating Jira ticket {ticket}: {e}")
                 passed = False

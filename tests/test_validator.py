@@ -124,3 +124,47 @@ def test_extract_tickets_ignoring_code_blocks(validator):
     # WMS-101, WMS-104, WMS-105 should be found
     # WMS-102, WMS-103 should be ignored
     assert tickets == {'WMS-101', 'WMS-104', 'WMS-105'}
+
+def test_extract_tickets_handles_none_values(validator):
+    # Test completely empty or None inputs
+    assert validator.extract_tickets(None, None) == set()
+    
+    # Test description is None or missing keys
+    mr_data = {
+        'title': None,
+        'description': 'WMS-999',
+        'source_branch': None
+    }
+    commits = [
+        {'title': None, 'message': None},
+        None,
+        {'title': 'WMS-888'}
+    ]
+    
+    assert validator.extract_tickets(mr_data, commits) == {'WMS-999', 'WMS-888'}
+
+def test_extract_tickets_commits_only(validator):
+    mr_data = {'title': 'Clean MR', 'description': 'No ticket here'}
+    commits = [{'title': 'WMS-555: fixing things'}]
+    assert validator.extract_tickets(mr_data, commits) == {'WMS-555'}
+
+def test_rule4_multiple_tickets_mixed_states(validator):
+    validator.gitlab.get_merge_request.return_value = {'draft': False, 'title': 'WMS-100 and WMS-200'}
+    validator.gitlab.get_merge_request_commits.return_value = []
+    
+    # Mock one valid state, one invalid state
+    def get_issue_mock(ticket):
+        if ticket == 'WMS-100':
+            return {'fields': {'status': {'name': 'In Review'}}}
+        if ticket == 'WMS-200':
+            return {'fields': {'status': {'name': 'In Progress'}}}
+        return None
+        
+    validator.jira.get_issue.side_effect = get_issue_mock
+    
+    passed, messages = validator.validate_mr('proj', 1)
+    
+    assert not passed
+    assert any("Jira ticket WMS-100 is in valid state 'In Review'" in msg for msg in messages)
+    assert any("Jira ticket WMS-200 is in invalid state 'In Progress'" in msg for msg in messages)
+
