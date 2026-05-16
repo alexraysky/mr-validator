@@ -1,0 +1,100 @@
+import re
+from typing import List, Tuple
+from gitlab_client import GitLabClient
+from jira_client import JiraClient
+
+class Validator:
+
+    def __init__(self, gitlab_client: GitLabClient, jira_client: JiraClient, ticket_regex: re.Pattern, valid_jira_states: set):
+        self.gitlab = gitlab_client
+        self.jira = jira_client
+        self.ticket_regex = ticket_regex
+        self.valid_jira_states = valid_jira_states
+
+    def _strip_code_blocks(self, text: str) -> str:
+        """Remove Markdown code blocks and inline code from text."""
+        if not text:
+            return ""
+        # Remove multi-line code blocks (```...```)
+        text = re.sub(r'```[\s\S]*?```', '', text)
+        # Remove inline code blocks (`...`)
+        text = re.sub(r'`[^`]*?`', '', text)
+        return text
+
+    def extract_tickets(self, mr_data: dict, commits: list) -> set:
+        """Extract all unique Jira tickets from MR title, description, branch, and commits."""
+        text_sources = [
+            mr_data.get('title', ''),
+            mr_data.get('description', ''),
+            mr_data.get('source_branch', '')
+        ]
+        
+        for commit in commits:
+            text_sources.append(commit.get('title', ''))
+            text_sources.append(commit.get('message', ''))
+            
+        # Strip code blocks from each source to avoid false positives
+        cleaned_sources = [self._strip_code_blocks(text) for text in text_sources if text]
+        combined_text = " ".join(cleaned_sources)
+        return set(self.ticket_regex.findall(combined_text))
+
+    def validate_mr(self, project_id: str, mr_iid: int) -> Tuple[bool, List[str]]:
+        """
+        Validates the MR against all rules.
+        Returns a tuple: (passed: bool, output_messages: list of str)
+        """
+        messages = []
+        passed = True
+
+        try:
+            mr_data = self.gitlab.get_merge_request(project_id, mr_iid)
+            commits = self.gitlab.get_merge_request_commits(project_id, mr_iid)
+        except Exception as e:
+            messages.append(f"[FAIL] Could not fetch MR data from GitLab: {e}")
+            return False, messages
+
+        # Rule 1: Draft state
+        is_draft = mr_data.get('draft', False)
+        if is_draft:
+            messages.append("[FAIL] Rule 1: MR is in Draft state.")
+            passed = False
+        else:
+            messages.append("[PASS] Rule 1: MR is not in Draft state.")
+
+        # Rule 2: Ticket reference
+        tickets = self.extract_tickets(mr_data, commits)
+        if not tickets:
+            messages.append("[FAIL] Rule 2: MR references zero Jira tickets.")
+            passed = False
+        else:
+            messages.append(f"[PASS] Rule 2: MR references Jira tickets: {', '.join(tickets)}.")
+
+        # If no tickets, we skip Rules 3 and 4
+        if not tickets:
+            return passed, messages
+
+        # Rules 3 & 4
+        for ticket in tickets:
+            try:
+                issue = self.jira.get_issue(ticket)
+                # Rule 3: Exists
+                if not issue:
+                    messages.append(f"[FAIL] Rule 3: Referenced Jira ticket {ticket} doesn't exist.")
+                    passed = False
+                    continue
+                else:
+                    messages.append(f"[PASS] Rule 3: Jira ticket {ticket} exists.")
+
+                # Rule 4: Status
+                # Based on mock_jira.py or standard Jira structure, status is usually at fields -> status -> name
+                status_name = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
+                if status_name not in self.valid_jira_states:
+                    messages.append(f"[FAIL] Rule 4: Jira ticket {ticket} is in invalid state '{status_name}'. Allowed states: {', '.join(self.valid_jira_states)}.")
+                    passed = False
+                else:
+                    messages.append(f"[PASS] Rule 4: Jira ticket {ticket} is in valid state '{status_name}'.")
+            except Exception as e:
+                messages.append(f"[FAIL] Error validating Jira ticket {ticket}: {e}")
+                passed = False
+
+        return passed, messages
