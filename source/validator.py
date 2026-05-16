@@ -1,7 +1,11 @@
 import re
 from typing import List, Tuple
+from concurrent.futures import ThreadPoolExecutor
 from gitlab_client import GitLabClient
 from jira_client import JiraClient
+
+CODE_BLOCK_RE = re.compile(r'```[\s\S]*?```')
+INLINE_CODE_RE = re.compile(r'`[^`]*?`')
 
 class Validator:
 
@@ -16,9 +20,9 @@ class Validator:
         if not text:
             return ""
         # Remove multi-line code blocks (```...```)
-        text = re.sub(r'```[\s\S]*?```', '', text)
+        text = CODE_BLOCK_RE.sub('', text)
         # Remove inline code blocks (`...`)
-        text = re.sub(r'`[^`]*?`', '', text)
+        text = INLINE_CODE_RE.sub('', text)
         return text
 
     def extract_tickets(self, mr_data: dict, commits: list) -> set:
@@ -84,29 +88,38 @@ class Validator:
             return passed, messages
 
         # Rules 3 & 4
-        for ticket in tickets:
+        def fetch_issue(ticket):
             try:
-                issue = self.jira.get_issue(ticket)
-                # Rule 3: Exists
-                if not issue:
-                    messages.append(f"[FAIL] Rule 3: Referenced Jira ticket {ticket} doesn't exist.")
-                    passed = False
-                    continue
-                else:
-                    messages.append(f"[PASS] Rule 3: Jira ticket {ticket} exists.")
-
-                # Rule 4: Status
-                status_name = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
-                if status_name not in self.valid_jira_states:
-                    messages.append(f"[FAIL] Rule 4: Jira ticket {ticket} is in invalid state '{status_name}'. Allowed states: {', '.join(self.valid_jira_states)}.")
-                    passed = False
-                else:
-                    messages.append(f"[PASS] Rule 4: Jira ticket {ticket} is in valid state '{status_name}'.")
-            except requests.exceptions.RequestException:
-                # Let actual connection/timeout/network errors bubble up
-                raise
+                return ticket, self.jira.get_issue(ticket), None
             except Exception as e:
-                messages.append(f"[FAIL] Error validating Jira ticket {ticket}: {e}")
+                return ticket, None, e
+
+        with ThreadPoolExecutor(max_workers=min(len(tickets), 5)) as executor:
+            results = list(executor.map(fetch_issue, tickets))
+
+        for ticket, issue, exc in results:
+            if exc is not None:
+                if isinstance(exc, requests.exceptions.RequestException):
+                    # Let actual connection/timeout/network errors bubble up
+                    raise exc
+                messages.append(f"[FAIL] Error validating Jira ticket {ticket}: {exc}")
                 passed = False
+                continue
+
+            # Rule 3: Exists
+            if not issue:
+                messages.append(f"[FAIL] Rule 3: Referenced Jira ticket {ticket} doesn't exist.")
+                passed = False
+                continue
+            else:
+                messages.append(f"[PASS] Rule 3: Jira ticket {ticket} exists.")
+
+            # Rule 4: Status
+            status_name = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
+            if status_name not in self.valid_jira_states:
+                messages.append(f"[FAIL] Rule 4: Jira ticket {ticket} is in invalid state '{status_name}'. Allowed states: {', '.join(self.valid_jira_states)}.")
+                passed = False
+            else:
+                messages.append(f"[PASS] Rule 4: Jira ticket {ticket} is in valid state '{status_name}'.")
 
         return passed, messages

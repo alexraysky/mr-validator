@@ -87,64 +87,68 @@ def main():
     gitlab_client = GitLabClient(base_url=args.gitlab_url, token=gitlab_token)
     jira_client = JiraClient(base_url=args.jira_url, token=jira_token)
 
-    # Startup Token/Connection Verification
-    if gitlab_token:
-        logger.debug("Verifying GitLab token...")
-        try:
-            if not gitlab_client.verify_auth():
-                logger.error("[FAIL] GitLab token is invalid or expired.")
+    try:
+        # Startup Token/Connection Verification
+        if gitlab_token:
+            logger.debug("Verifying GitLab token...")
+            try:
+                if not gitlab_client.verify_auth():
+                    logger.error("[FAIL] GitLab token is invalid or expired.")
+                    sys.exit(2)
+                else:
+                    logger.debug("GitLab token successfully verified.")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"[FAIL] Could not connect to GitLab at {args.gitlab_url}: {e}")
                 sys.exit(2)
-            else:
-                logger.debug("GitLab token successfully verified.")
+
+        # init validator
+        validator = Validator(
+            gitlab_client=gitlab_client,
+            jira_client=jira_client,
+            ticket_regex=TICKET_REGEX,
+            valid_jira_states=VALID_JIRA_STATES
+        )
+
+        # do the validation
+        logger.info(f"Validating MR !{args.mr_iid} for project {args.project_id}...")
+        try:
+            passed, messages = validator.validate_mr(args.project_id, args.mr_iid)
         except requests.exceptions.RequestException as e:
-            logger.error(f"[FAIL] Could not connect to GitLab at {args.gitlab_url}: {e}")
+            logger.error(f"[FAIL] Infrastructure/Connection error calling GitLab/Jira APIs: {e}")
             sys.exit(2)
 
-    # init validator
-    validator = Validator(
-        gitlab_client=gitlab_client,
-        jira_client=jira_client,
-        ticket_regex=TICKET_REGEX,
-        valid_jira_states=VALID_JIRA_STATES
-    )
-
-    # do the validation
-    logger.info(f"Validating MR !{args.mr_iid} for project {args.project_id}...")
-    try:
-        passed, messages = validator.validate_mr(args.project_id, args.mr_iid)
-    except requests.exceptions.RequestException as e:
-        logger.error(f"[FAIL] Infrastructure/Connection error calling GitLab/Jira APIs: {e}")
-        sys.exit(2)
-
-    # Output results based on format
-    if args.output_format == "json":
-        result = {
-            "passed": passed,
-            "project_id": args.project_id,
-            "mr_iid": args.mr_iid,
-            "messages": messages
-        }
-        # Print JSON document cleanly to stdout
-        print(json.dumps(result, indent=2))
-        sys.exit(0 if passed else 1)
-    else:
-        # print text results via logger
-        logger.info("")
-        logger.info("--- Validation Summary ---")
-        for msg in messages:
-            if msg.startswith("[PASS]"):
-                logger.info(msg)
-            elif msg.startswith("[FAIL]"):
-                logger.error(msg)
-            else:
-                logger.info(msg)
-        logger.info("--------------------------")
-        if passed:
-            logger.info("Result: PASS. MR can be merged.")
-            sys.exit(0)
+        # Output results based on format
+        if args.output_format == "json":
+            result = {
+                "passed": passed,
+                "project_id": args.project_id,
+                "mr_iid": args.mr_iid,
+                "messages": messages
+            }
+            # Print JSON document cleanly to stdout
+            print(json.dumps(result, indent=2))
+            sys.exit(0 if passed else 1)
         else:
-            logger.error("Result: FAIL. MR does not meet requirements.")
-            sys.exit(1)
+            # print text results via logger
+            logger.info("")
+            logger.info("--- Validation Summary ---")
+            for msg in messages:
+                if msg.startswith("[PASS]"):
+                    logger.info(msg)
+                elif msg.startswith("[FAIL]"):
+                    logger.error(msg)
+                else:
+                    logger.info(msg)
+            logger.info("--------------------------")
+            if passed:
+                logger.info("Result: PASS. MR can be merged.")
+                sys.exit(0)
+            else:
+                logger.error("Result: FAIL. MR does not meet requirements.")
+                sys.exit(1)
+    finally:
+        gitlab_client.close()
+        jira_client.close()
 
 
 def entrypoint():

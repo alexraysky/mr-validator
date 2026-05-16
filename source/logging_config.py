@@ -15,28 +15,22 @@ class ColorFormatter(logging.Formatter):
         self.use_color = use_color
 
     def format(self, record):
-        orig_msg = record.msg
+        formatted = super().format(record)
         
         # Apply colors if enabled
         if self.use_color:
             if record.levelno == logging.ERROR:
-                record.msg = f"{self.ANSI_RED}{orig_msg}{self.ANSI_RESET}"
+                return f"{self.ANSI_RED}{formatted}{self.ANSI_RESET}"
             elif record.levelno == logging.WARNING:
-                record.msg = f"{self.ANSI_YELLOW}{orig_msg}{self.ANSI_RESET}"
+                return f"{self.ANSI_YELLOW}{formatted}{self.ANSI_RESET}"
             elif record.levelno == logging.INFO:
-                msg_str = str(orig_msg)
-                if msg_str.startswith("[PASS]"):
-                    record.msg = f"{self.ANSI_GREEN}{orig_msg}{self.ANSI_RESET}"
-                elif msg_str.startswith("[FAIL]"):
-                    record.msg = f"{self.ANSI_RED}{orig_msg}{self.ANSI_RESET}"
-                elif "Result: PASS" in msg_str:
-                    record.msg = f"{self.ANSI_GREEN}{orig_msg}{self.ANSI_RESET}"
-                elif "Result: FAIL" in msg_str:
-                    record.msg = f"{self.ANSI_RED}{orig_msg}{self.ANSI_RESET}"
+                msg_str = str(record.msg)
+                if msg_str.startswith("[PASS]") or "Result: PASS" in msg_str:
+                    return f"{self.ANSI_GREEN}{formatted}{self.ANSI_RESET}"
+                elif msg_str.startswith("[FAIL]") or "Result: FAIL" in msg_str:
+                    return f"{self.ANSI_RED}{formatted}{self.ANSI_RESET}"
         
-        result = super().format(record)
-        record.msg = orig_msg
-        return result
+        return formatted
 
 def setup_logging(verbose: bool = False, quiet: bool = False, force_color: bool = None):
     """
