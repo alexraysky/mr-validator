@@ -1,4 +1,5 @@
 import requests
+from helpers import with_retries
 
 class JiraClient:
     def __init__(self, base_url: str = "http://localhost:8080", token: str = None):
@@ -7,6 +8,7 @@ class JiraClient:
         if token:
             self.session.headers.update({"Authorization": f"Bearer {token}"})
 
+    @with_retries
     def get_issue(self, issue_key: str) -> dict:
         """
         Fetch issue metadata.
