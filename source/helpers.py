@@ -2,27 +2,28 @@ import time
 import requests
 from functools import wraps
 from constants import MAX_RETRIES, RETRY_BACKOFF_BASE
+from logging_config import logger
 
 def print_red(message):
-    print(f"\033[91m{message}\033[0m")
+    logger.error(message)
 
 def print_green(message):
-    print(f"\033[92m{message}\033[0m")
+    logger.info(message)
 
 def print_yellow(message):
-    print(f"\033[93m{message}\033[0m")
+    logger.warning(message)
 
 def print_blue(message):
-    print(f"\033[94m{message}\033[0m")
+    logger.info(message)
 
 def print_purple(message):
-    print(f"\033[95m{message}\033[0m")
+    logger.info(message)
 
 def print_cyan(message):
-    print(f"\033[96m{message}\033[0m")
+    logger.info(message)
 
 def print_white(message):
-    print(f"\033[97m{message}\033[0m")
+    logger.info(message)
 
 def with_retries(func):
     """
@@ -55,13 +56,13 @@ def with_retries(func):
                                 pass
                     
                     wait_time = retry_after if retry_after is not None else pow(RETRY_BACKOFF_BASE, i + 1)
-                    print_yellow(f"Rate limited (429). Retrying in {wait_time}s... (Retry {i+1}/{MAX_RETRIES})")
+                    logger.warning(f"Rate limited (429). Retrying in {wait_time}s... (Retry {i+1}/{MAX_RETRIES})")
                     time.sleep(wait_time)
                 elif status_code is not None and status_code >= 500:
                     if i == MAX_RETRIES:
                         break
                     wait_time = pow(RETRY_BACKOFF_BASE, i + 1)
-                    print_yellow(f"Server error ({status_code}). Retrying in {wait_time}s... (Retry {i+1}/{MAX_RETRIES})")
+                    logger.warning(f"Server error ({status_code}). Retrying in {wait_time}s... (Retry {i+1}/{MAX_RETRIES})")
                     time.sleep(wait_time)
                 else:
                     # Client errors (400, 401, 403, 404, etc.) are raised immediately
@@ -71,7 +72,7 @@ def with_retries(func):
                 if i == MAX_RETRIES:
                     break
                 wait_time = pow(RETRY_BACKOFF_BASE, i + 1)
-                print_yellow(f"Network error ({e.__class__.__name__}): {e}. Retrying in {wait_time}s... (Retry {i+1}/{MAX_RETRIES})")
+                logger.warning(f"Network error ({e.__class__.__name__}): {e}. Retrying in {wait_time}s... (Retry {i+1}/{MAX_RETRIES})")
                 time.sleep(wait_time)
             except Exception:
                 # Any other programming error or unexpected exception is raised immediately
