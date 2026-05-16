@@ -147,7 +147,7 @@ def main():
             sys.exit(1)
 
 
-if __name__ == "__main__":
+def entrypoint():
     try:
         main()
     except KeyboardInterrupt:
@@ -156,5 +156,9 @@ if __name__ == "__main__":
     except Exception as e:
         logger.critical(f"[FATAL] Unexpected error: {e}", exc_info=logger.isEnabledFor(logging.DEBUG))
         sys.exit(2)
+
+
+if __name__ == "__main__":
+    entrypoint()
 
 
