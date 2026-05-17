@@ -16,7 +16,8 @@ class JiraClient:
         Returns the issue dict if found, or None if the issue is a 404.
         """
         url = f"{self.base_url}/rest/api/3/issue/{issue_key}"
-        response = self.session.get(url, timeout=REQUEST_TIMEOUT)
+        params = {"fields": "status,issuetype"}
+        response = self.session.get(url, params=params, timeout=REQUEST_TIMEOUT)
         if response.status_code == 404:
             return None
         response.raise_for_status()

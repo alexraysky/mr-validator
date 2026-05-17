@@ -134,7 +134,8 @@ class MockJiraHandler(BaseHTTPRequestHandler):
     server_version = "MockJira/1.0"
 
     def do_GET(self):
-        match = ISSUE_PATH_RE.match(self.path)
+        path = self.path.split('?', 1)[0]
+        match = ISSUE_PATH_RE.match(path)
         if match:
             self._handle_issue(match.group(1))
             return
