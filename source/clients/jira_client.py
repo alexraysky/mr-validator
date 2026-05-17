@@ -1,12 +1,16 @@
-import requests
 from helpers import with_retries, REQUEST_TIMEOUT
+from clients.base_client import BaseClient
 
-class JiraClient:
+class JiraClient(BaseClient):
     def __init__(self, base_url: str = "http://localhost:8080", token: str = None):
-        self.base_url = base_url.rstrip('/')
-        self.session = requests.Session()
+        super().__init__(base_url)
         if token:
             self.session.headers.update({"Authorization": f"Bearer {token}"})
+
+    @property
+    def auth_endpoint(self) -> str:
+        return "/rest/api/3/myself"
+
 
     @with_retries
     def get_issue(self, issue_key: str) -> dict:
@@ -21,13 +25,3 @@ class JiraClient:
             return None
         response.raise_for_status()
         return response.json()
-
-    def close(self):
-        """Close the requests Session."""
-        self.session.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
