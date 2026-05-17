@@ -135,6 +135,11 @@ class MockJiraHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split('?', 1)[0]
+        
+        if path == "/rest/api/3/myself":
+            self._send_json(200, {"accountId": "mock-user", "displayName": "Mock User"})
+            return
+
         match = ISSUE_PATH_RE.match(path)
         if match:
             self._handle_issue(match.group(1))
