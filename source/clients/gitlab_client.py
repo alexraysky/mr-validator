@@ -1,7 +1,6 @@
 import urllib.parse
 import requests
-from helpers import with_retries
-from constants import REQUEST_TIMEOUT
+from helpers import with_retries, REQUEST_TIMEOUT
 
 class GitLabClient:
     def __init__(self, base_url: str = "https://gitlab.com", token: str = None):
@@ -48,3 +47,13 @@ class GitLabClient:
         response = self.session.get(url, timeout=REQUEST_TIMEOUT)
         response.raise_for_status()
         return response.json()
+
+    def close(self):
+        """Close the requests Session."""
+        self.session.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()

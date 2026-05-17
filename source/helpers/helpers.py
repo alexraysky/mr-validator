@@ -1,29 +1,8 @@
 import time
 import requests
 from functools import wraps
-from constants import MAX_RETRIES, RETRY_BACKOFF_BASE
-from logging_config import logger
-
-def print_red(message):
-    logger.error(message)
-
-def print_green(message):
-    logger.info(message)
-
-def print_yellow(message):
-    logger.warning(message)
-
-def print_blue(message):
-    logger.info(message)
-
-def print_purple(message):
-    logger.info(message)
-
-def print_cyan(message):
-    logger.info(message)
-
-def print_white(message):
-    logger.info(message)
+from helpers.constants import MAX_RETRIES, RETRY_BACKOFF_BASE
+from helpers.logging_config import logger
 
 def with_retries(func):
     """

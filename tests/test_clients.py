@@ -1,9 +1,8 @@
 import pytest
 import responses
 import requests
-from source.gitlab_client import GitLabClient
-from source.jira_client import JiraClient
-from source.constants import REQUEST_TIMEOUT
+from source.clients import GitLabClient, JiraClient
+from source.helpers import REQUEST_TIMEOUT
 
 @responses.activate
 def test_gitlab_client_headers_and_encoding():

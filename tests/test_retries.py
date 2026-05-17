@@ -1,8 +1,7 @@
 import unittest
 import requests
 from unittest.mock import MagicMock, patch
-from source.helpers import with_retries
-from source.constants import MAX_RETRIES, RETRY_BACKOFF_BASE
+from source.helpers import with_retries, MAX_RETRIES, RETRY_BACKOFF_BASE
 
 class TestRetries(unittest.TestCase):
     

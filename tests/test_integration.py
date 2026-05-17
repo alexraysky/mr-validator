@@ -7,10 +7,9 @@ import os
 import json
 import importlib
 from http.server import HTTPServer
-from source.validator import Validator
-from source.gitlab_client import GitLabClient
-from source.jira_client import JiraClient
-from source.constants import TICKET_REGEX, VALID_JIRA_STATES
+from source.core import Validator
+from source.clients import GitLabClient, JiraClient
+from source.helpers import TICKET_REGEX, VALID_JIRA_STATES
 
 # Try to import the MockJiraHandler from mocks/mock_jira.py
 try:

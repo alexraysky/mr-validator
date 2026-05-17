@@ -2,8 +2,7 @@ import pytest
 import logging
 import json
 import sys
-from source.logging_config import ColorFormatter, setup_logging, logger
-from source.helpers import print_red, print_green, print_yellow
+from source.helpers.logging_config import ColorFormatter, setup_logging, logger
 
 def test_color_formatter_adds_ansi_escape_codes():
     formatter_color = ColorFormatter(use_color=True)
@@ -46,20 +45,6 @@ def test_setup_logging_levels():
     # Test default sets INFO level
     setup_logging(verbose=False, quiet=False, force_color=False)
     assert logger.level == logging.INFO
-
-def test_helpers_delegate_to_logger(mocker):
-    mock_info = mocker.patch.object(logger, 'info')
-    mock_warning = mocker.patch.object(logger, 'warning')
-    mock_error = mocker.patch.object(logger, 'error')
-    
-    print_green("Green msg")
-    mock_info.assert_called_once_with("Green msg")
-    
-    print_yellow("Yellow msg")
-    mock_warning.assert_called_once_with("Yellow msg")
-    
-    print_red("Red msg")
-    mock_error.assert_called_once_with("Red msg")
 
 def test_json_format_output(mocker, capsys):
     import importlib
