@@ -22,7 +22,7 @@ python -m venv .venv
 # Activate the venv:
 # Windows: .venv\Scripts\activate
 # Linux/Mac: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r source/requirements.txt
 ```
 
 ## Usage
@@ -30,7 +30,8 @@ pip install -r requirements.txt
 You can run the CLI with standard arguments:
 
 ```bash
-python -m source.mr-validator --project-id sztomi/mr-validator-homework --mr-iid 1
+cd source
+python mr-validator.py --project-id sztomi/mr-validator-homework --mr-iid 1
 ```
 
 ### Environment Variables
@@ -44,11 +45,12 @@ For convenience, particularly in a CI environment, you can set the following env
 ### Example with mock Jira
 1. In one terminal, start the mock Jira server:
    ```bash
-   python source/mock_jira.py
+   python mocks/mock_jira.py
    ```
 2. In another terminal, run the validator against the public repository:
    ```bash
-   python -m source.mr-validator --project-id sztomi/mr-validator-homework --mr-iid 1
+   cd source
+   python mr-validator.py --project-id sztomi/mr-validator-homework --mr-iid 1
    ```
 
 ## Running Tests
