@@ -11,6 +11,10 @@ def validator():
     return Validator(mock_gitlab, mock_jira, TICKET_REGEX, VALID_JIRA_STATES)
 
 def test_extract_tickets(validator):
+    """
+    Verifies the core regex extracts Jira tickets 
+    from the MR title, description, and commit messages.
+    """
     mr_data = {
         'title': 'WMS-1234: Add new feature',
         'description': 'This fixes WMS-5678 and also WMS-1234.',
@@ -26,11 +30,17 @@ def test_extract_tickets(validator):
     assert tickets == {'WMS-1234', 'WMS-5678', 'WMS-9999', 'WMS-0001'}
 
 def test_extract_tickets_empty(validator):
+    """
+    Verifies behavior when no tickets are present in any string.
+    """
     mr_data = {'title': 'No ticket here'}
     commits = []
     assert validator.extract_tickets(mr_data, commits) == set()
 
 def test_rule1_draft_mr(validator):
+    """
+    Evaluates Rule 1: MRs must not be in draft state.
+    """
     validator.gitlab.get_merge_request.return_value = {'draft': True, 'title': 'WMS-123'}
     validator.gitlab.get_merge_request_commits.return_value = []
     
@@ -40,6 +50,9 @@ def test_rule1_draft_mr(validator):
     assert any("Rule 1: MR is in Draft state" in msg for msg in messages)
 
 def test_rule2_zero_tickets(validator):
+    """
+    Evaluates Rule 2: MRs must reference at least one Jira ticket.
+    """
     validator.gitlab.get_merge_request.return_value = {'draft': False, 'title': 'No tickets here'}
     validator.gitlab.get_merge_request_commits.return_value = []
     
@@ -49,6 +62,9 @@ def test_rule2_zero_tickets(validator):
     assert any("Rule 2: MR references zero Jira tickets" in msg for msg in messages)
 
 def test_rule3_missing_ticket(validator):
+    """
+    Evaluates Rule 3: Jira tickets must actually exist.
+    """
     validator.gitlab.get_merge_request.return_value = {'draft': False, 'title': 'WMS-404'}
     validator.gitlab.get_merge_request_commits.return_value = []
     
@@ -61,6 +77,10 @@ def test_rule3_missing_ticket(validator):
     assert any("Rule 3: Referenced Jira ticket WMS-404 doesn't exist" in msg for msg in messages)
 
 def test_rule4_invalid_status(validator):
+    """
+    Evaluates Rule 4: Jira tickets must be in 
+    a predefined valid state (e.g., "In Review", "Done").
+    """
     validator.gitlab.get_merge_request.return_value = {'draft': False, 'title': 'WMS-100'}
     validator.gitlab.get_merge_request_commits.return_value = []
     
@@ -76,6 +96,9 @@ def test_rule4_invalid_status(validator):
     assert any("Rule 4: Jira ticket WMS-100 is in invalid state" in msg for msg in messages)
 
 def test_all_rules_pass(validator):
+    """
+    Complete happy-path validation of all four rules.
+    """
     validator.gitlab.get_merge_request.return_value = {'draft': False, 'title': 'WMS-200'}
     validator.gitlab.get_merge_request_commits.return_value = []
     
@@ -94,6 +117,9 @@ def test_all_rules_pass(validator):
     assert any("Rule 4: Jira ticket WMS-200 is in valid state 'In Review'" in msg for msg in messages)
 
 def test_strip_code_blocks(validator):
+    """
+    Tests the internal utility that removes markdown code blocks from text.
+    """
     # Test multi-line blocks
     text_with_block = "Keep this. ```\nIgnore this WMS-123\n``` And this."
     assert validator._strip_code_blocks(text_with_block).strip() == "Keep this.  And this."
@@ -111,6 +137,9 @@ def test_strip_code_blocks(validator):
     assert validator._strip_code_blocks(None) == ""
 
 def test_extract_tickets_ignoring_code_blocks(validator):
+    """
+    Ensures tickets wrapped in code blocks are ignored during extraction.
+    """
     mr_data = {
         'title': 'WMS-101: Fix bug',
         'description': 'Check this code: `WMS-102` and ```WMS-103```. Also see WMS-104.',
@@ -125,6 +154,10 @@ def test_extract_tickets_ignoring_code_blocks(validator):
     assert tickets == {'WMS-101', 'WMS-104', 'WMS-105'}
 
 def test_extract_tickets_handles_none_values(validator):
+    """
+    Ensures `extract_tickets` does not throw `TypeError` 
+    when encountering `None` values for keys like 'description' or 'message'.
+    """
     # Test completely empty or None inputs
     assert validator.extract_tickets(None, None) == set()
     
@@ -143,11 +176,19 @@ def test_extract_tickets_handles_none_values(validator):
     assert validator.extract_tickets(mr_data, commits) == {'WMS-999', 'WMS-888'}
 
 def test_extract_tickets_commits_only(validator):
+    """
+    Ensures tickets are found even if they *only* exist in commit messages 
+    (and not in the MR title/description).
+    """
     mr_data = {'title': 'Clean MR', 'description': 'No ticket here'}
     commits = [{'title': 'WMS-555: fixing things'}]
     assert validator.extract_tickets(mr_data, commits) == {'WMS-555'}
 
 def test_rule4_multiple_tickets_mixed_states(validator):
+    """
+    Evaluates Rule 4 when multiple tickets are present, 
+    and one is valid while another is invalid.
+    """
     validator.gitlab.get_merge_request.return_value = {'draft': False, 'title': 'WMS-100 and WMS-200'}
     validator.gitlab.get_merge_request_commits.return_value = []
     

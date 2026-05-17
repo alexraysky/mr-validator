@@ -7,6 +7,10 @@ class TestRetries(unittest.TestCase):
     
     @patch('time.sleep', return_value=None) # Don't actually sleep
     def test_with_retries_success_eventually(self, mock_sleep):
+        """
+        Validates that functions decorated with `@with_retries` recover from `ConnectionError` 
+        and succeed on subsequent attempts.
+        """
         # Function that fails twice then succeeds
         mock_func = MagicMock()
         mock_func.side_effect = [
@@ -30,6 +34,9 @@ class TestRetries(unittest.TestCase):
 
     @patch('time.sleep', return_value=None)
     def test_with_retries_all_fail(self, mock_sleep):
+        """
+        Validates that when maximum retries (`MAX_RETRIES`) are exhausted, the original exception is raised.
+        """
         mock_func = MagicMock()
         mock_func.side_effect = requests.exceptions.ConnectionError("Permanent Fail")
         
@@ -45,6 +52,9 @@ class TestRetries(unittest.TestCase):
 
     @patch('time.sleep', return_value=None)
     def test_with_retries_non_retriable_client_error(self, mock_sleep):
+        """
+        Ensures `4xx` Client Errors (e.g., `403 Forbidden`) do *not* trigger a retry.
+        """
         mock_func = MagicMock()
         response = MagicMock(status_code=403, headers={})
         mock_func.side_effect = requests.exceptions.HTTPError("Forbidden", response=response)
@@ -59,6 +69,9 @@ class TestRetries(unittest.TestCase):
 
     @patch('time.sleep', return_value=None)
     def test_with_retries_retriable_server_error(self, mock_sleep):
+        """
+        Ensures `5xx` Server Errors (e.g., `503 Service Unavailable`) *do* trigger retries.
+        """
         mock_func = MagicMock()
         response = MagicMock(status_code=503, headers={})
         mock_func.side_effect = [
@@ -75,6 +88,9 @@ class TestRetries(unittest.TestCase):
 
     @patch('time.sleep', return_value=None)
     def test_with_retries_429_rate_limit_with_retry_after(self, mock_sleep):
+        """
+        Handles `429 Too Many Requests` specifically by respecting the `Retry-After` HTTP header if present.
+        """
         mock_func = MagicMock()
         response = MagicMock(status_code=429, headers={"Retry-After": "42"})
         mock_func.side_effect = [
@@ -91,6 +107,10 @@ class TestRetries(unittest.TestCase):
 
     @patch('time.sleep', return_value=None)
     def test_with_retries_non_requests_exception(self, mock_sleep):
+        """
+        Ensures completely unrelated exceptions (like `ValueError` or programming bugs)
+        are not retried.
+        """
         mock_func = MagicMock()
         mock_func.side_effect = ValueError("Programming bug")
         
