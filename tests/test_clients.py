@@ -6,6 +6,10 @@ from source.helpers import REQUEST_TIMEOUT
 
 @responses.activate
 def test_gitlab_client_headers_and_encoding():
+    """
+    Verifies that GitLabClient sets the required 
+    `Private-Token` header and correctly URL-encodes project IDs.
+    """
     client = GitLabClient(token="secret-token")
     project_id = "group/project"
     mr_iid = 123
@@ -26,6 +30,10 @@ def test_gitlab_client_headers_and_encoding():
 
 @responses.activate
 def test_jira_client_404_returns_none():
+    """
+    Checks that JiraClient gracefully returns `None` 
+    when it encounters a 404 response (non-existent ticket).
+    """
     client = JiraClient()
     url = "http://localhost:8080/rest/api/3/issue/WMS-404"
     
@@ -40,6 +48,10 @@ def test_jira_client_404_returns_none():
 
 @responses.activate
 def test_jira_client_auth_header():
+    """
+    Verifies that JiraClient properly formats and sets
+    the `Authorization` header with `Bearer <token>`.
+    """
     client = JiraClient(token="jira-token")
     url = "http://localhost:8080/rest/api/3/issue/WMS-1"
     
@@ -53,7 +65,28 @@ def test_jira_client_auth_header():
     client.get_issue("WMS-1")
     assert responses.calls[0].request.headers["Authorization"] == "Bearer jira-token"
 
+@responses.activate
+def test_jira_client_verify_auth():
+    """
+    Verifies that JiraClient.verify_auth returns True on 200, False on 401/403.
+    """
+    client = JiraClient()
+    url = "http://localhost:8080/rest/api/3/myself"
+    
+    responses.add(responses.GET, url, status=200)
+    assert client.verify_auth() is True
+
+    responses.replace(responses.GET, url, status=401)
+    assert client.verify_auth() is False
+
+    responses.replace(responses.GET, url, status=403)
+    assert client.verify_auth() is False
+
 def test_gitlab_client_timeout_setting(mocker):
+    """
+    Ensures GitLabClient enforces a `REQUEST_TIMEOUT` 
+    when making HTTP requests to prevent indefinite hanging.
+    """
     # Use pytest-mock (mocker) to verify the timeout arg is passed
     client = GitLabClient()
     # We patch the underlying session.get
@@ -67,6 +100,10 @@ def test_gitlab_client_timeout_setting(mocker):
     assert kwargs['timeout'] == REQUEST_TIMEOUT
 
 def test_jira_client_timeout_setting(mocker):
+    """
+    Ensures JiraClient enforces a `REQUEST_TIMEOUT` 
+    when making HTTP requests.
+    """
     client = JiraClient()
     mock_get = mocker.patch.object(client.session, 'get')
     mock_get.return_value.status_code = 200

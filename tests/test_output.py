@@ -5,6 +5,9 @@ import sys
 from source.helpers.logging_config import ColorFormatter, setup_logging, logger
 
 def test_color_formatter_adds_ansi_escape_codes():
+    """
+    Ensures the `ColorFormatter` injects ANSI green codes for `[PASS]` log messages.
+    """
     formatter_color = ColorFormatter(use_color=True)
     formatter_plain = ColorFormatter(use_color=False)
     
@@ -23,6 +26,9 @@ def test_color_formatter_adds_ansi_escape_codes():
     assert "\033[0m" not in formatted_plain
 
 def test_color_formatter_handles_error():
+    """
+    Ensures `ERROR` log levels receive red ANSI escape codes.
+    """
     formatter_color = ColorFormatter(use_color=True)
     
     record_error = logging.LogRecord(
@@ -34,6 +40,10 @@ def test_color_formatter_handles_error():
     assert "\033[91m" in formatted_color  # ANSI red code present
 
 def test_setup_logging_levels():
+    """
+    Verifies `setup_logging` accurately configures `DEBUG`, `ERROR`, or `INFO` levels
+    based on CLI flags.
+    """
     # Test verbose sets DEBUG level and has timestamps
     setup_logging(verbose=True, quiet=False, force_color=False)
     assert logger.level == logging.DEBUG
@@ -47,6 +57,9 @@ def test_setup_logging_levels():
     assert logger.level == logging.INFO
 
 def test_json_format_output(mocker, capsys):
+    """
+    Tests that switching `--output json` successfully overrides standard text logging.
+    """
     import importlib
     mr_validator = importlib.import_module("source.mr-validator")
 

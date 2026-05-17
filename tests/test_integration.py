@@ -45,6 +45,10 @@ def validator(gitlab_client, jira_client):
 
 @responses.activate
 def test_integration_valid_jira_state(validator):
+    """
+    End-to-end validation of the "happy path" where an MR references 
+    a valid Jira ticket in an accepted state ("In Review").
+    """
     # Enable passthrough to localhost mock Jira server
     responses.add_passthru("http://localhost:8080")
     
@@ -79,6 +83,9 @@ def test_integration_valid_jira_state(validator):
 
 @responses.activate
 def test_integration_invalid_jira_state(validator):
+    """
+    E2E test where the referenced Jira ticket is in a rejected state ("In Progress").
+    """
     responses.add_passthru("http://localhost:8080")
     
     # Mock GitLab MR metadata referencing WMS-1010 (status: In Progress - invalid)
@@ -107,6 +114,10 @@ def test_integration_invalid_jira_state(validator):
 
 @responses.activate
 def test_integration_missing_jira_ticket(validator):
+    """
+    E2E test verifying that referencing a non-existent Jira ticket 
+    results in a clean failure.
+    """
     responses.add_passthru("http://localhost:8080")
     
     # Mock GitLab MR referencing non-existent ticket WMS-9999
@@ -135,6 +146,10 @@ def test_integration_missing_jira_ticket(validator):
 
 @responses.activate
 def test_integration_cli_json_end_to_end(mocker, capsys):
+    """
+    Verifies that running the CLI with `--output json` produces valid, 
+    parseable JSON on `stdout` and exits successfully.
+    """
     responses.add_passthru("http://localhost:8080")
     
     mr_validator = importlib.import_module("source.mr-validator")
