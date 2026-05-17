@@ -47,6 +47,53 @@ class Validator:
         combined_text = " ".join(cleaned_sources)
         return set(self.ticket_regex.findall(combined_text))
 
+    @staticmethod
+    def _check_draft(mr_data: dict, messages: List[str]) -> bool:
+        passed = True
+        is_draft = mr_data.get('draft', False)
+        if is_draft:
+            messages.append("[FAIL] Rule 1: MR is in Draft state.")
+            passed = False
+        else:
+            messages.append("[PASS] Rule 1: MR is not in Draft state.")
+        return passed
+
+    def _check_tickets(self, tickets: set, messages: List[str]) -> bool:
+        passed = True
+        
+        if not tickets:
+            passed = False
+            messages.append("[FAIL] Rule 2: MR references zero Jira tickets.")
+        else:
+            messages.append(f"[PASS] Rule 2: MR references Jira tickets: {', '.join(tickets)}.")
+        return passed
+
+    def _check_issue(self, ticket: str, issue: dict, exc: Exception, messages: List[str]) -> bool:
+        passed = True
+        if exc is not None:
+            if isinstance(exc, requests.exceptions.RequestException):
+                # Let actual connection/timeout/network errors bubble up
+                raise exc
+            messages.append(f"[FAIL] Error validating Jira ticket {ticket}: {exc}")
+            return False
+
+        # Rule 3: Exists
+        if not issue:
+            messages.append(f"[FAIL] Rule 3: Referenced Jira ticket {ticket} doesn't exist.")
+            return False
+        else:
+            messages.append(f"[PASS] Rule 3: Jira ticket {ticket} exists.")
+
+        # Rule 4: Status
+        status_name = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
+        if status_name not in self.valid_jira_states:
+            messages.append(f"[FAIL] Rule 4: Jira ticket {ticket} is in invalid state '{status_name}'. Allowed states: {', '.join(self.valid_jira_states)}.")
+            return False
+        else:
+            messages.append(f"[PASS] Rule 4: Jira ticket {ticket} is in valid state '{status_name}'.")
+
+        return True
+
     def validate_mr(self, project_id: str, mr_iid: int) -> Tuple[bool, List[str]]:
         """
         Validates the MR against all rules.
@@ -67,26 +114,19 @@ class Validator:
             return False, messages
 
         # Rule 1: Draft state
-        is_draft = mr_data.get('draft', False)
-        if is_draft:
-            messages.append("[FAIL] Rule 1: MR is in Draft state.")
-            passed = False
-        else:
-            messages.append("[PASS] Rule 1: MR is not in Draft state.")
-
+        passed &= self._check_draft(mr_data, messages)
+        
         # Rule 2: Ticket reference
         tickets = self.extract_tickets(mr_data, commits)
-        if not tickets:
-            messages.append("[FAIL] Rule 2: MR references zero Jira tickets.")
-            passed = False
-        else:
-            messages.append(f"[PASS] Rule 2: MR references Jira tickets: {', '.join(tickets)}.")
+        passed &= self._check_tickets(tickets, messages)
 
         # If no tickets, we skip Rules 3 and 4
-        if not tickets:
+        if not passed:
             return passed, messages
 
         # Rules 3 & 4
+        # probably can be replaced by the loop with get_issue calls
+        # but let's keep it for now
         def fetch_issue(ticket):
             try:
                 return ticket, self.jira.get_issue(ticket), None
@@ -94,31 +134,9 @@ class Validator:
                 return ticket, None, e
 
         with ThreadPoolExecutor(max_workers=min(len(tickets), 5)) as executor:
-            results = list(executor.map(fetch_issue, tickets))
+            issues = list(executor.map(fetch_issue, tickets))
 
-        for ticket, issue, exc in results:
-            if exc is not None:
-                if isinstance(exc, requests.exceptions.RequestException):
-                    # Let actual connection/timeout/network errors bubble up
-                    raise exc
-                messages.append(f"[FAIL] Error validating Jira ticket {ticket}: {exc}")
-                passed = False
-                continue
-
-            # Rule 3: Exists
-            if not issue:
-                messages.append(f"[FAIL] Rule 3: Referenced Jira ticket {ticket} doesn't exist.")
-                passed = False
-                continue
-            else:
-                messages.append(f"[PASS] Rule 3: Jira ticket {ticket} exists.")
-
-            # Rule 4: Status
-            status_name = issue.get('fields', {}).get('status', {}).get('name', 'Unknown')
-            if status_name not in self.valid_jira_states:
-                messages.append(f"[FAIL] Rule 4: Jira ticket {ticket} is in invalid state '{status_name}'. Allowed states: {', '.join(self.valid_jira_states)}.")
-                passed = False
-            else:
-                messages.append(f"[PASS] Rule 4: Jira ticket {ticket} is in valid state '{status_name}'.")
+        for ticket, issue, exc in issues:
+            passed &= self._check_issue(ticket, issue, exc, messages)
 
         return passed, messages
