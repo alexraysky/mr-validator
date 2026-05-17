@@ -8,9 +8,9 @@ import requests
 from dotenv import load_dotenv
 
 from clients import GitLabClient, JiraClient
-from core import Validator
+from core import Validator, post_results
 from helpers import TICKET_REGEX, VALID_JIRA_STATES, DEFAULT_PROJECT_ID
-from helpers import setup_logging, logger
+from helpers import setup_logging, logger, verify_connections
 
 
 def parse_args():
@@ -61,7 +61,7 @@ def handle_sigterm(signum, frame):
     sys.exit(130)
 
 
-def main():
+def do_validate():
     # Register SIGTERM signal handler
     signal.signal(signal.SIGTERM, handle_sigterm)
 
@@ -87,17 +87,14 @@ def main():
 
     try:
         # Startup Token/Connection Verification
-        if gitlab_token:
-            logger.debug("Verifying GitLab token...")
-            try:
-                if not gitlab_client.verify_auth():
-                    logger.error("[FAIL] GitLab token is invalid or expired.")
-                    sys.exit(2)
-                else:
-                    logger.debug("GitLab token successfully verified.")
-            except requests.exceptions.RequestException as e:
-                logger.error(f"[FAIL] Could not connect to GitLab at {args.gitlab_url}: {e}")
-                sys.exit(2)
+        verify_connections(
+            gitlab_token=gitlab_token,
+            gitlab_client=gitlab_client,
+            gitlab_url=args.gitlab_url,
+            jira_token=jira_token,
+            jira_client=jira_client,
+            jira_url=args.jira_url
+        )
 
         # init validator
         validator = Validator(
@@ -116,42 +113,17 @@ def main():
             sys.exit(2)
 
         # Output results based on format
-        if args.output_format == "json":
-            result = {
-                "passed": passed,
-                "project_id": args.project_id,
-                "mr_iid": args.mr_iid,
-                "messages": messages
-            }
-            # Print JSON document cleanly to stdout
-            print(json.dumps(result, indent=2))
-            sys.exit(0 if passed else 1)
-        else:
-            # print text results via logger
-            logger.info("")
-            logger.info("--- Validation Summary ---")
-            for msg in messages:
-                if msg.startswith("[PASS]"):
-                    logger.info(msg)
-                elif msg.startswith("[FAIL]"):
-                    logger.error(msg)
-                else:
-                    logger.info(msg)
-            logger.info("--------------------------")
-            if passed:
-                logger.info("Result: PASS. MR can be merged.")
-                sys.exit(0)
-            else:
-                logger.error("Result: FAIL. MR does not meet requirements.")
-                sys.exit(1)
+        post_results(args, passed, messages)
+
+        sys.exit(0 if passed else 1)    
     finally:
         gitlab_client.close()
         jira_client.close()
 
 
-def entrypoint():
+def main():
     try:
-        main()
+        do_validate()
     except KeyboardInterrupt:
         logger.error("\nExecution interrupted by user (Ctrl+C). Exiting.")
         sys.exit(130)
@@ -161,6 +133,6 @@ def entrypoint():
 
 
 if __name__ == "__main__":
-    entrypoint()
+    main()
 
 
