@@ -1,6 +1,5 @@
 import requests
-from helpers import with_retries
-from constants import REQUEST_TIMEOUT
+from helpers import with_retries, REQUEST_TIMEOUT
 
 class JiraClient:
     def __init__(self, base_url: str = "http://localhost:8080", token: str = None):
@@ -32,4 +31,3 @@ class JiraClient:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close()
-

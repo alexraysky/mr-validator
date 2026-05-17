@@ -7,12 +7,10 @@ import signal
 import requests
 from dotenv import load_dotenv
 
-from gitlab_client import GitLabClient
-from jira_client import JiraClient
-from validator import Validator
-from constants import TICKET_REGEX, VALID_JIRA_STATES, DEFAULT_PROJECT_ID
-from helpers import *
-from logging_config import setup_logging, logger
+from clients import GitLabClient, JiraClient
+from core import Validator
+from helpers import TICKET_REGEX, VALID_JIRA_STATES, DEFAULT_PROJECT_ID
+from helpers import setup_logging, logger
 
 
 def parse_args():

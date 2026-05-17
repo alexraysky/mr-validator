@@ -2,7 +2,7 @@ import pytest
 import logging
 import json
 import sys
-from source.logging_config import ColorFormatter, setup_logging, logger
+from source.helpers.logging_config import ColorFormatter, setup_logging, logger
 
 def test_color_formatter_adds_ansi_escape_codes():
     formatter_color = ColorFormatter(use_color=True)

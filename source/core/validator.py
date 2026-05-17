@@ -1,8 +1,7 @@
 import re
 from typing import List, Tuple
 from concurrent.futures import ThreadPoolExecutor
-from gitlab_client import GitLabClient
-from jira_client import JiraClient
+from clients import GitLabClient, JiraClient
 
 CODE_BLOCK_RE = re.compile(r'```[\s\S]*?```')
 INLINE_CODE_RE = re.compile(r'`[^`]*?`')

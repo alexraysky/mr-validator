@@ -1,8 +1,8 @@
 import time
 import requests
 from functools import wraps
-from constants import MAX_RETRIES, RETRY_BACKOFF_BASE
-from logging_config import logger
+from helpers.constants import MAX_RETRIES, RETRY_BACKOFF_BASE
+from helpers.logging_config import logger
 
 def with_retries(func):
     """
